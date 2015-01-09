@@ -1,0 +1,15 @@
+LIBTELNET
+
+https://github.com/seanmiddleditch/libtelnet
+packages: libtelnet2 libtelnet-dev libtelnet-utils
+
+LIBCONFIG
+
+https://github.com/hyperrealm/libconfig
+packages: libconfig-dev
+
+SQLITE
+
+https://www.sqlite.org/cintro.html
+https://www.sqlite.org/c3ref/intro.html
+packages: libsqlite3-dev
