@@ -24,6 +24,11 @@ struct user_t
 
 static struct user_t user;
 
+static void _event_handler()
+{
+	// PLEASE WRITE ME!!!!
+}
+
 int main(int argc, char *argv[])
 {
 	int sockfd;
