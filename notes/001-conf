@@ -1,0 +1,10 @@
+GENERAL
+setting can be saved via db or .cfg file . .cfg file overrides db
+
+SERVER
+bind address
+port
+
+SECURITY
+how-much-time-another-registrations-by-ip
+howw-much-time-another-post-ip / user
