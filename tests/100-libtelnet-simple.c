@@ -5,6 +5,11 @@
 #include <resolv.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <ctype.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <poll.h>
 
 #include <libtelnet.h>
 
@@ -13,67 +18,198 @@
 static const telnet_telopt_t telopts[] =
 {
 	{ TELNET_TELOPT_COMPRESS2,	TELNET_WILL,	TELNET_DONT },
+	{ TELNET_TELOPT_NAWS,		TELNET_WILL,	TELNET_DO },
 	{ -1, 0, 0 }
-}
+};
 
 struct user_t
 {
 	int sock;
 	telnet_t *telnet;
-}
+
+	unsigned int width, height;
+};
 
 static struct user_t user;
 
-static void _event_handler()
+static void _send(int sock, const char *buffer, unsigned int size)
 {
-	// PLEASE WRITE ME!!!!
+	int rs;
+
+	if(sock == -1) return;
+
+	while(size > 0)
+	{
+		if((rs = send(sock, buffer, size, 0)) == -1)
+		{
+			if(errno != EINTR && errno != ECONNRESET)
+			{
+				fprintf(stderr, "send() error\n");
+				exit(1);
+			}
+			else return; 
+		}
+		else if(rs == 0)
+		{
+			fprintf(stderr, "send() returned 0\n");
+			exit(1);
+		}
+
+		buffer += rs;
+		size -= rs;
+	}
+}
+
+static void _event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data)
+{
+	struct user_t *user = (struct user_t*)user_data;
+
+	switch(ev->type)
+	{
+		case TELNET_EV_DATA:
+			printf("TELNET_EV_DATA\n");
+			break;
+
+		case TELNET_EV_SEND:
+			printf("TELNET_EV_SEND\n");
+			_send(user->sock, ev->data.buffer, ev->data.size);
+			break;
+
+		case TELNET_EV_SUBNEGOTIATION:
+			printf("TELNET_EV_SUBNEGOTIANTION\n");
+			if(ev->sub.telopt == TELNET_TELOPT_NAWS)
+				printf("NAWS subnegotiation has %d bytes\n", ev->data.size);
+				telnet_printf(telnet, "NAWS subnegotiation has %d bytes\n", ev->data.size);
+			break;
+
+		case TELNET_EV_WILL:
+			printf("client will\n");
+			break;
+
+		case TELNET_EV_WONT:
+			printf("client wont\n");
+			break;
+
+		case TELNET_EV_ERROR:
+			close(user->sock);
+			user->sock = -1;
+			telnet_free(user->telnet);
+			printf("TELNET_EV_ERROR\n");
+			break;
+
+		default:
+			break;
+	}
 }
 
 int main(int argc, char *argv[])
 {
-	int sockfd;
-	struct sockaddr_in self;
-	telnet_t *telnet;
+	int listen_sock;
+	struct sockaddr_in addr;
+	//telnet_t *telnet;
+	//struct sockaddr_in client_addr;
+	socklen_t addrlen;
+	int rs;
+	struct pollfd pfd[2];
 
-	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+	char buffer[512];
+
+	memset(&pfd, 0, sizeof(pfd));
+	if((listen_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
 		perror("cant open socket\n");
 		exit(errno);
 	}
+	setsockopt(listen_sock, SOL_SOCKET, SO_REUSEADDR, (void*)&rs, sizeof(rs));
+	rs = 1;
 
-	bzero(&self, sizeof(self));
-	self.sin_family = AF_INET;
-	self.sin_port = htons(MY_PORT);
-	self.sin_addr.s_addr = INADDR_ANY;
+	//bzero(&self, sizeof(self));
+	memset(&addr, 0, sizeof(addr));
 
-	if( bind(sockfd, (struct sockaddr*)&self, sizeof(self)) != 0 )
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(MY_PORT);
+	addr.sin_addr.s_addr = INADDR_ANY;
+
+	if( bind(listen_sock, (struct sockaddr*)&addr, sizeof(addr)) != 0 )
 	{
 		perror("cant bind");
 		exit(errno);
 	}
 
-	if( listen(sockfd, 20) != 0 )
+	if( listen(listen_sock, 20) != 0 )
 	{
 		perror("cant listen");
 		exit(errno);
 	}
 
+	pfd[1].fd = listen_sock;
+	pfd[1].events = POLLIN;
+
+
 	while(1)
 	{
-		int clientfd;
-		struct sockaddr_in client_addr;
-		int addrlen = sizeof(client_addr);
+		if(user.sock != -1)
+		{
+			pfd[0].fd = user.sock;
+			pfd[0].events = POLLIN;
+		}
+		else
+		{
+			pfd[0].fd = -1;
+			pfd[0].events = 0;
+		}
 
-		clientfd = accept(sockfd, (struct sockaddr*)&client_addr, &addrlen);
-		printf("Connected client: %s:%d\n", inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+		rs = poll(pfd, 2, -1);
+		if(rs == -1 && errno == EINTR)
+		{
+			printf("Poll failed\n");
+			return 1;
+		}
 
-		telnet_init(telopts, _event_handler, 0, &user);
+		if(pfd[1].revents & POLLIN)
+		{
+		
+			addrlen = sizeof(addr);
+
+			if((rs = accept(listen_sock, (struct sockaddr*)&addr, &addrlen)) == -1)
+			{
+				fprintf(stderr, "accept() failed %d.\n", errno);
+				return 1;
+			}
+
+			printf("Connected client: %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+
+			user.sock = rs;
+			user.telnet = telnet_init(telopts, _event_handler, 0, &user);
+
+			telnet_negotiate(user.telnet, TELNET_DO, TELNET_TELOPT_NAWS);
+		}
+
+		if(pfd[0].revents & POLLIN)
+		{
+			if( (rs = recv(user.sock, buffer, sizeof(buffer), 0)) > 0)
+			{
+				telnet_recv(user.telnet, buffer, sizeof(buffer));
+			}
+			else if(rs == 0)
+			{
+				printf("connection closed\n");
+				close(user.sock);
+				telnet_free(user.telnet);
+				user.sock = -1;
+				break;
+			}
+			else if(errno != EINTR)
+			{
+				fprintf(stderr, "recv() failed\n");
+				exit(1);
+			}
+		}
 		//send(clientfd, "Hello, world!", sizeof("Hello, world!"), 0);
 
-		close(clientfd);
 	}
 
-	close(sockfd);
+	close(listen_sock);
 
 	return 0;
 }
