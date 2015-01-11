@@ -60,11 +60,14 @@ static void _send(int sock, const char *buffer, unsigned int size)
 	}
 }
 
-static void _draw(int width, int height, void *buffer, telnet_t telnet)
+static void _draw(int width, int height, telnet_t *telnet)
 {
 	int i;
 
 	int tl,hl,tr,vl,bl,br;
+
+	int buffer_size;
+	char *buffer = 0x77;
 
 	tl = 218;
 	hl = 196;
@@ -73,18 +76,36 @@ static void _draw(int width, int height, void *buffer, telnet_t telnet)
 	bl = 192;
 	br = 217;
 
-	buffer_size = width*height;
+/*	buffer_size = width*height + 1;
 
 	buffer = malloc(buffer_size);
 
 	for(i=0; i < buffer_size; i++)
 	{
-		if(i==0) buffer[i] = tl;
-		else if(i==(width-1)) buffer[i] = tr;
-	}
+		if(i==0)
+		{
+			buffer[i] = 14;
+			break;
+		}
+		else if(i==1)
+		{
+			buffer[i] = tl;
+			break;
+		}
+		else if(i<width)
+		{
+			buffer[i] = hl;
+			break;
+		}
+		else if(i==width)
+		{
+			buffer[i] = tr;
+			break;
+		}
+	}*/
 
-	telnet_send(telnet, buffer, buffer_size);
-	free(buffer);
+	telnet_send(telnet, "hey", sizeof("hey"));
+//	free(buffer);
 
 	return;
 }

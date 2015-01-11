@@ -18,6 +18,8 @@
 static const telnet_telopt_t telopts[] =
 {
 	{ TELNET_TELOPT_COMPRESS2,	TELNET_WILL,	TELNET_DONT },
+	   // { TELNET_TELOPT_BINARY,    TELNET_WILL, TELNET_DO   },
+	{ TELNET_TELOPT_XASCII, 	TELNET_WILL, TELNET_DO},
 	{ TELNET_TELOPT_NAWS,		TELNET_WILL,	TELNET_DO },
 	{ -1, 0, 0 }
 };
@@ -60,30 +62,95 @@ static void _send(int sock, const char *buffer, unsigned int size)
 	}
 }
 
-static void _draw(int width, int height, void *buffer, telnet_t telnet)
+char* iso88959_to_utf8(const char *str)
+{
+	char *utf8 = malloc(1 + (2 * strlen(str)));
+
+	if (utf8)
+	{
+		char *c = utf8;
+		for (; *str; ++str)
+		{
+			if (*str & 0x80) { *c++ = *str;	}
+			else
+			{
+				*c++ = (char) (0xc0 | (unsigned) *str >> 6);
+				*c++ = (char) (0x80 | (*str & 0x3f));
+			}
+		}
+		*c++ = '\0';
+	}
+	return utf8;
+}
+
+static void _draw(int width, int height, telnet_t *telnet)
 {
 	int i;
 
-	int tl,hl,tr,vl,bl,br;
+	unsigned char tl,hl,tr,vl,bl,br;
 
-	tl = 218;
+	unsigned char si, so;
+
+	int buffer_size;
+	unsigned char *buffer;
+
+	int x, y;
+
+	x = 1;
+	y = 1;
+
+	si = 15;
+	so = 14;
+
+/*	tl = 218;
 	hl = 196;
 	tr = 191;
 	vl = 179;
 	bl = 192;
-	br = 217;
+	br = 217; */
+
+	tl = 0x6c;
+	hl = 0x71;
+	tr = 0x6b;
+	vl = 0x78;
+	bl = 0x6d;
+	br = 0x6a;
+	
+	tl = 'A';
+	br = 'Z';
+	/*tl = 65;
+	hl = 66;
+	tr = 67;
+	vl = 68;
+	bl = 69;
+	br = 70; */
 
 	buffer_size = width*height;
 
-	buffer = malloc(buffer_size);
+	buffer = (unsigned char *)malloc(buffer_size);
+	memset(buffer, 0, buffer_size);
 
 	for(i=0; i < buffer_size; i++)
 	{
-		if(i==0) buffer[i] = tl;
-		else if(i==(width-1)) buffer[i] = tr;
+		if(x == 1 &&y == 1) { buffer[i] = tl; }
+		else if(y==1 && x!=width) { buffer[i] = hl; }
+		else if(y==1 && x==width) { buffer[i] = tr; }
+		else if(x==1 && y!=height) {buffer[i] = vl; }
+		else if((x>1 && x<width) && (y>1&& y<height) ) { buffer[i] = ' '; }
+		else if(x==width && y!=height) { buffer[i] = vl; }
+		else if(x==1 && y==height) { buffer[i] = bl; }
+		else if(y==height && x != width) { buffer[i] = hl; }
+		else if(y==height && x==width) { buffer[i] = br; }
+
+		if( x == width ) { x=1; y++; }
+		else{ x++; }
 	}
 
+	//telnet_printf(telnet, "%i%i\n", 14, tl);
+	telnet_send(telnet, &si, 1);
 	telnet_send(telnet, buffer, buffer_size);
+	telnet_send(telnet, &so, 1);
+
 	free(buffer);
 
 	return;
