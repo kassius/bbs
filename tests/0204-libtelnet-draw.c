@@ -134,8 +134,8 @@ static int _draw(int width, int height, telnet_t *telnet)
 	buffer2_start = buffer2;
 	
 	iconv_ret = iconv(cd, &buffer, &ibl, &buffer2, &obl);
-	//b2_strlen = mbstowcs(NULL, buffer2_start, 0);
-	b2_strlen = strlen(buffer2_start);
+	//b2_strlen = mbstowcs(NULL, buffer2, 0);
+	tgglheb2_strlen = strlen(buffer2_start);
 
 	telnet_send(telnet, buffer2_start, b2_strlen);
 
