@@ -18,10 +18,11 @@
 
 static const telnet_telopt_t telopts[] =
 {
-	{ TELNET_TELOPT_COMPRESS2,	TELNET_WILL,	TELNET_DONT },
-	   // { TELNET_TELOPT_BINARY,    TELNET_WILL, TELNET_DO   },
-	{ TELNET_TELOPT_XASCII, 	TELNET_WILL, TELNET_DO},
+    { TELNET_TELOPT_BINARY,    	TELNET_WILL,	 TELNET_DO },
+    { TELNET_TELOPT_ECHO,    	TELNET_WILL,	 TELNET_DO },
 	{ TELNET_TELOPT_NAWS,		TELNET_WILL,	TELNET_DO },
+	//{ TELNET_TELOPT_COMPRESS2,	TELNET_WILL,	TELNET_DONT },
+	//{ TELNET_TELOPT_XASCII, 	TELNET_WILL, 	TELNET_DO },
 	{ -1, 0, 0 }
 };
 
@@ -38,12 +39,18 @@ static struct user_t user;
 static void _send(int sock, const char *buffer, unsigned int size)
 {
 	int rs;
+	unsigned int size_counter;
+	
+	const char *ptr;
+	
+	ptr = buffer;
+	size_counter = size;
 
 	if(sock == -1) return;
 
-	while(size > 0)
+	while(size_counter > 0)
 	{
-		if((rs = send(sock, buffer, size, 0)) == -1)
+		if((rs = send(sock, ptr, size_counter, 0)) == -1)
 		{
 			if(errno != EINTR && errno != ECONNRESET)
 			{
@@ -58,8 +65,8 @@ static void _send(int sock, const char *buffer, unsigned int size)
 			exit(1);
 		}
 
-		buffer += rs;
-		size -= rs;
+		ptr += rs;
+		size_counter -= rs;
 	}
 }
 
@@ -70,12 +77,13 @@ static int _draw(int width, int height, telnet_t *telnet)
 	unsigned char tl,hl,tr,vl,bl,br;
 
 	char *buffer, *buffer2;
-	char *buffer2_start;
+	char *buffer_start, *buffer2_start;
 	
 	size_t ibl, obl;
-	size_t b2_strlen;
-	
-	int b_size, b2_size;
+
+	unsigned int frame_size;
+	unsigned int b2_strlen;
+	unsigned int b_size, b2_size;
 
 	iconv_t cd;
 	
@@ -91,8 +99,9 @@ static int _draw(int width, int height, telnet_t *telnet)
 	bl = 192;
 	br = 217;
 
+	frame_size = (width*height);
 	b_size = (width*height)+1;
-	b2_size = (b_size*4)+4;
+	b2_size = (b_size*4);
 	
 	ibl = b_size;
 	obl = b2_size;
@@ -103,7 +112,7 @@ static int _draw(int width, int height, telnet_t *telnet)
 	memset(buffer, 0, b_size);
 	memset(buffer2, 0, b2_size);
 
-	for(i=0; i < b_size; i++)
+	for(i=0; i < frame_size; i++)
 	{
 		if(x == 1 &&y == 1) { buffer[i] = tl; }
 		else if(y==1 && x!=width) { buffer[i] = hl; }
@@ -121,16 +130,17 @@ static int _draw(int width, int height, telnet_t *telnet)
 	
 	cd = iconv_open("UTF-8", "CP437");
 	
+	buffer_start = buffer;
 	buffer2_start = buffer2;
 	
 	iconv_ret = iconv(cd, &buffer, &ibl, &buffer2, &obl);
 	//b2_strlen = mbstowcs(NULL, buffer2_start, 0);
 	b2_strlen = strlen(buffer2_start);
 
-	telnet_send(telnet, buffer2_start, (b2_strlen-1));
+	telnet_send(telnet, buffer2_start, b2_strlen);
 
-	free(buffer);
-	free(buffer2);
+	free(buffer_start);
+	free(buffer2_start);
 	iconv_close(cd);
 
 	return 0;
