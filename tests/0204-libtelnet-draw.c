@@ -135,8 +135,9 @@ static int _draw(int width, int height, telnet_t *telnet)
 	
 	iconv_ret = iconv(cd, &buffer, &ibl, &buffer2, &obl);
 	//b2_strlen = mbstowcs(NULL, buffer2, 0);
-	tgglheb2_strlen = strlen(buffer2_start);
+	b2_strlen = strlen(buffer2_start);
 
+	telnet_send(telnet, "\x00\x1B\x00\x63", 4); //clear screen
 	telnet_send(telnet, buffer2_start, b2_strlen);
 
 	free(buffer_start);
@@ -168,7 +169,7 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data
 				user->width = (ev->sub.buffer[0] * 256) + (unsigned char)ev->sub.buffer[1];
 				user->height = (ev->sub.buffer[2] * 256) + (unsigned char)ev->sub.buffer[3];
 
-				telnet_printf(telnet, "client width is x: %d and y: %d\n", user->width, user->height);
+				//telnet_printf(telnet, "client width is x: %d and y: %d\n", user->width, user->height);
 				printf("client width is x: %d and y: %d\n", user->width, user->height);
 				_draw(user->width, user->height, telnet);
 			}
