@@ -79,9 +79,27 @@ static void _send(int sock, const char *buffer, unsigned int size)
 
 /*static int _draw_buffer(int width, int height, telnet_t *telnet, user_t *user_data)
 {
+	int frame_size;
+	struct user_t *user = (struct user_t*)user_data; 
+	frame_size = (width-2)*((height-2)/2);
+	for(i=0; i < frame_size; i++)
+	{
+		if(x == 1 &&y == 1) { buffer[i] = tl; }
+		else if(y==1 && x!=width) { buffer[i] = hl; }
+		else if(y==1 && x==width) { buffer[i] = tr; }
+		else if(x==1 && y!=height) {buffer[i] = vl; }
+		else if((x>1 && x<width) && (y>1&& y<height) ) { buffer[i] = ' '; }
+		else if(x==width && y!=height) { buffer[i] = vl; }
+		else if(x==1 && y==height) { buffer[i] = bl; }
+		else if(y==height && x != width) { buffer[i] = hl; }
+		else if(y==height && x==width) { buffer[i] = br; }
+
+		if( x == width ) { x=1; y++; }
+		else{ x++; }
+	}
 }*/
 
-static int _draw(int width, int height, telnet_t *telnet)
+static int _draw(int width, int height, telnet_t *telnet, void *user_data)
 {
 	int i;
 
@@ -103,6 +121,8 @@ static int _draw(int width, int height, telnet_t *telnet)
 	int x = 1;
 	int y = 1;
 	
+	struct user_t *user = (struct user_t*)user_data; 
+	
 	tl = 218;
 	hl = 196;
 	tr = 191;
@@ -113,7 +133,7 @@ static int _draw(int width, int height, telnet_t *telnet)
 	frame_size = (width*height);
 	b_size = (width*height)+1;
 	b2_size = (b_size*4);
-	
+		
 	ibl = b_size;
 	obl = b2_size;
 
@@ -137,6 +157,10 @@ static int _draw(int width, int height, telnet_t *telnet)
 
 		if( x == width ) { x=1; y++; }
 		else{ x++; }
+	}
+	
+	if(user->textmode)
+	{
 	}
 	
 	cd = iconv_open("UTF-8", "CP437");
@@ -203,7 +227,27 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data
 			printf("TELNET_EV_SEND (%d bytes)\n", ev->data.size);
 			_send(user->sock, ev->data.buffer, ev->data.size);
 			break;
+			
+		case TELNET_EV_IAC:
+			printf("TELNET_EV_IAC (iac: %d)", ev->iac.cmd);
+			break;
 
+		case TELNET_EV_WILL:
+			printf("TELNET_EV_WILL\n");
+			break;
+			
+		case TELNET_EV_DO:
+			printf("TELNET_EV_WILL\n");
+			break;
+
+		case TELNET_EV_WONT:
+			printf("TELNET_EV_WONT\n");
+			break;
+			
+		case TELNET_EV_DONT:
+			printf("TELNET_EV_DONT\n");
+			break;
+			
 		case TELNET_EV_SUBNEGOTIATION:
 			printf("TELNET_EV_SUBNEGOTIANTION (telopt is %d)\n", ev->sub.telopt);
 			if(ev->sub.telopt == TELNET_TELOPT_NAWS)
@@ -213,18 +257,34 @@ static void _event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data
 
 				//telnet_printf(telnet, "client width is x: %d and y: %d\n", user->width, user->height);
 				printf("client width is x: %d and y: %d\n", user->width, user->height);
-				_draw(user->width, user->height, telnet);
+				_draw(user->width, user->height, telnet, user);
 			}
 			break;
-
-		case TELNET_EV_WILL:
-			printf("client will\n");
+			
+		case TELNET_EV_COMPRESS:
+			printf("TELNET_EV_COMPRESS\n");
 			break;
-
-		case TELNET_EV_WONT:
-			printf("client wont\n");
+			
+		case TELNET_EV_ZMP:
+			printf("TELNET_EV_ZMP\n");
 			break;
-
+			
+		case TELNET_EV_TTYPE:
+			printf("TELNET_EV_TTYPE\n");
+			break;
+			
+		case TELNET_EV_ENVIRON:
+			printf("TELNET_EV_ENVIRON\n");
+			break;
+			
+		case TELNET_EV_MSSP:
+			printf("TELNET_EV_MSSP\n");
+			break;
+			
+		case TELNET_EV_WARNING:
+			printf("TELNET_EV_WARNING\n");
+			break;
+			
 		case TELNET_EV_ERROR:
 			close(user->sock);
 			user->sock = -1;
