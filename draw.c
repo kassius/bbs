@@ -1,8 +1,9 @@
 #include <libtelnet.h>
+#include <math.h>
 
 #include "draw.h"
 
-void _draw_textbox(unsigned char *screen_buffer,int screen_width, int screen_height)
+void _draw_textbox(char *screen_buffer, int screen_width, int screen_height)
 {
 	int i=0;
 	int x=1;
@@ -10,15 +11,13 @@ void _draw_textbox(unsigned char *screen_buffer,int screen_width, int screen_hei
 	
 	int padding=1;
 	
-//	unsigned char str_movec[20];
-	
 	int textbox_width = (screen_width-2);
 	int textbox_height = ((screen_height-2)/2);
 	int frame_size = (textbox_width * textbox_height);
 	
-	int screen_vmiddle = (screen_height/2); //vertical middle
+	double sh = screen_height;
 	
-	//struct user_t *user = (struct user_t*)user_data;
+	int screen_vmiddle = floor(sh/2); //vertical middle
 	
 	for(i=0; i < frame_size; i++)
 	{
@@ -108,9 +107,6 @@ static int _draw(int width, int height, telnet_t *telnet, void *user_data)
 	
 	telnet_send(telnet, "\x00\x1B\x00\x5b\x00\x32\x00\x3b\x00\x32\x00\x48", 12); //cursor position
 	telnet_send(telnet, "Hello dude", 10);
-	
-
-	
 
 	free(buffer_start);
 	free(buffer2_start);
