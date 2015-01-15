@@ -13,37 +13,5 @@
 #define DRAW_BRa 76
 
 #define DRAW_RESET "\x1B\x63"
-#define DRAW_MOVE_CURSOR(xx,yy) "\x1B[xx;yyH" //<ESC>[{x};{y}H;
 
-unsigned char *draw_move_cursor(unsigned char *string, int x, int y)
-{
-	unsigned char cX[5], cY[5];
-	
-	sprintf(cX, "%d", x);
-	sprintf(cY, "%d", y);
-	
-	sprintf(string, "%x[%s,%sH", 0x1B, cX, cY );
-}
-
-/*unsigned char *draw_move_cursor_iconv(unsigned char *string, int x, int y)
-{
-	unsigned char cX[5], cY[5];
-	
-	sprintf(cX, "%d", x);
-	sprintf(cY, "%d", y);
-	
-	sprintf(string, "%x%x%x%x%x%x%x%x%x%x%x%x",
-		0x00,
-		0x1B, // ESC
-		0x00,
-		0x5B, // '['
-		0x00,
-		0x32, //makeme
-		0x00,
-		0x3b, // ','
-		0x00,
-		0x32,
-		0x00,
-		0x48 // 'H'
-		)
-}*/
+#define DRAW_BUFFER_OFFSET(w,m,x,y,p) (((w*m)+(w*y))+p+x)-1 // -1 because buffer index
