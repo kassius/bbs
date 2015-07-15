@@ -12,12 +12,12 @@ void _event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data)
 			break;
 
 		case TELNET_EV_SEND:
-			printf("TELNET_EV_SEND (%d bytes)\n", ev->data.size);
+			printf("TELNET_EV_SEND\n\t(%d bytes)\n", ev->data.size);
 			_send(user->sock, ev->data.buffer, ev->data.size);
 			break;
 			
 		case TELNET_EV_IAC:
-			printf("TELNET_EV_IAC (iac: %d)", ev->iac.cmd);
+			printf("TELNET_EV_IAC\n\t(iac: %d)", ev->iac.cmd);
 			break;
 
 		case TELNET_EV_WILL:
@@ -44,7 +44,7 @@ void _event_handler(telnet_t *telnet, telnet_event_t *ev, void *user_data)
 				user->height = (ev->sub.buffer[2] * 256) + (unsigned char)ev->sub.buffer[3];
 
 				//telnet_printf(telnet, "client width is x: %d and y: %d\n", user->width, user->height);
-				printf("client width is x: %d and y: %d\n", user->width, user->height);
+				printf("\tClient width is x: %d and y: %d\n", user->width, user->height);
 				_draw(user->width, user->height, telnet, user);
 			}
 			break;

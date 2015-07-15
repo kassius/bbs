@@ -22,7 +22,7 @@
 #include "net.c"
 #include "events.c"
 
-static struct user_t user;
+static struct user_t users[MAX_USERS];
 
 void _user_init(void *user_data)
 {
@@ -38,11 +38,17 @@ int main(int argc, char *argv[])
 	socklen_t addrlen;
 	
 	int rs;
-	struct pollfd pfd[2];
+	struct pollfd pfd[MAX_USERS + 1];
 
 	char buffer[512];
+	
+	int i;
 
 	memset(&pfd, 0, sizeof(pfd));
+	memset(users, 0, sizeof(users));
+	
+	for(i=0; i<MAX_USERS; i++)
+		{ users[i].sock = -1; }
 	
 	if((listen_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
 	{
@@ -70,30 +76,33 @@ int main(int argc, char *argv[])
 		exit(errno);
 	}
 
-	pfd[1].fd = listen_sock;
-	pfd[1].events = POLLIN;
+	pfd[MAX_USERS].fd = listen_sock;
+	pfd[MAX_USERS].events = POLLIN;
 
 	while(1)
 	{
-		if(user.sock != -1)
+		for(i=0; i<MAX_USERS; i++)
 		{
-			pfd[0].fd = user.sock;
-			pfd[0].events = POLLIN;
-		}
-		else
-		{
-			pfd[0].fd = -1;
-			pfd[0].events = 0;
+			if(users[i].sock != -1)
+			{
+				pfd[i].fd = users[i].sock;
+				pfd[i].events = POLLIN;
+			}
+			else
+			{
+				pfd[i].fd = -1;
+				pfd[i].events = 0;
+			}	
 		}
 
-		rs = poll(pfd, 2, -1);
+		rs = poll(pfd, MAX_USERS + 1, -1);
 		if(rs == -1 && errno == EINTR)
 		{
 			printf("Poll failed\n");
 			return 1;
 		}
 
-		if(pfd[1].revents & POLLIN)
+		if(pfd[MAX_USERS].revents & POLLIN)
 		{
 		
 			addrlen = sizeof(addr);
@@ -106,33 +115,52 @@ int main(int argc, char *argv[])
 
 			printf("Connected client: %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 
-			user.sock = rs;
-			user.telnet = telnet_init(telopts, _event_handler, 0, &user);
+			for(i=0; i<MAX_USERS; i++)
+			{
+				if(users[i].sock == -1)
+					break;
+					
+				if(i == MAX_USERS)
+				{
+					printf("Connection reset.. too many users\n");
+					//_send(rs, "Too many users.. please try again later\n\r");
+					close(rs);
+				}
+			}
+			
+			users[i].sock = rs;
+			users[i].telnet = telnet_init(telopts, _event_handler, 0, &users[i]);
 
-			telnet_negotiate(user.telnet, TELNET_DO, TELNET_TELOPT_NAWS);
-			telnet_negotiate(user.telnet, TELNET_WILL, TELNET_TELOPT_ECHO);
-			telnet_negotiate(user.telnet, TELNET_WILL, TELNET_TELOPT_SGA);
-			telnet_negotiate(user.telnet, TELNET_WONT, TELNET_TELOPT_LINEMODE);
+			telnet_negotiate(users[i].telnet, TELNET_DO, TELNET_TELOPT_NAWS);
+			telnet_negotiate(users[i].telnet, TELNET_WILL, TELNET_TELOPT_ECHO);
+			telnet_negotiate(users[i].telnet, TELNET_WILL, TELNET_TELOPT_SGA);
+			telnet_negotiate(users[i].telnet, TELNET_WONT, TELNET_TELOPT_LINEMODE);
 		}
 
-		if(pfd[0].revents & POLLIN)
+		for(i=0; i < MAX_USERS; i++)
 		{
-			if( (rs = recv(user.sock, buffer, sizeof(buffer), 0)) > 0)
+			if(users[i].sock == -1)
+				continue;
+				
+			if(pfd[i].revents & POLLIN)
 			{
-				telnet_recv(user.telnet, buffer, sizeof(buffer));
-			}
-			else if(rs == 0)
-			{
-				printf("connection closed\n");
-				close(user.sock);
-				telnet_free(user.telnet);
-				user.sock = -1;
-				break;
-			}
-			else if(errno != EINTR)
-			{
-				fprintf(stderr, "recv() failed\n");
-				exit(1);
+				if( (rs = recv(users[i].sock, buffer, sizeof(buffer), 0)) > 0)
+				{
+					telnet_recv(users[i].telnet, buffer, sizeof(buffer));
+				}
+				else if(rs == 0)
+				{
+					printf("connection closed\n");
+					close(users[i].sock);
+					telnet_free(users[i].telnet);
+					users[i].sock = -1;
+					break;
+				}
+				else if(errno != EINTR)
+				{
+					fprintf(stderr, "recv() failed\n");
+					exit(1);
+				}
 			}
 		}
 		//send(clientfd, "Hello, world!", sizeof("Hello, world!"), 0);

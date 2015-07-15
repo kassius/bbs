@@ -1,6 +1,6 @@
 #define MY_PORT	9999
 
-#define MAX_USERS	2 
+#define MAX_USERS	5
 #define USER_BUFFER	1025
 
 static const telnet_telopt_t telopts[] =

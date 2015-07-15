@@ -24,6 +24,8 @@ void _process_key(telnet_t *telnet, void *user_data, const char *buffer, unsigne
 				printf("User CTRL+D\n");
 				telnet_printf(telnet, "%sBye.", DRAW_RESET);
 				close(user->sock);
+				user->sock = -1;
+				
 				break;
 				
 			case 24: //ctrl+x
